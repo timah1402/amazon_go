@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1068801430715",
+    "project_id": "go-36d25",
+    "storage_bucket": "go-36d25.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1068801430715:android:bdf23de87cf4bd72aa059e",
+        "android_client_info": {
+          "package_name": "com.dieldem.amazongo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnsJ912LQx7KMulD975H2KqRWp2a4mgAI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
