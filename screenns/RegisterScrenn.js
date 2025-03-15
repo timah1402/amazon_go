@@ -4,7 +4,7 @@ import tw from "tailwind-react-native-classnames";
 import { auth } from "../firebase"; // Adjust the path as needed
 import { db } from "../firebase"; // Firestore reference
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, setDoc, doc } from "firebase/firestore";
 
 const RegisterScreen = ({ navigation }) => {
   const [fullName, setFullName] = useState("");
@@ -28,9 +28,9 @@ const RegisterScreen = ({ navigation }) => {
       // Create user with Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-
+      console.log("User created: ", user);
       // Add user data to Firestore
-      await addDoc(collection(db, "users"), {
+      await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         fullName,
         email,
