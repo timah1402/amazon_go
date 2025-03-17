@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -18,12 +18,14 @@ import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImageManipulator from "expo-image-manipulator";
+import QRCode from "react-native-qrcode-svg";
 
 const AdditionalInfoScreen = ({ navigation }) => {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [selfie, setSelfie] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const qrCodeRef = useRef(null); // Ref for QR code component
 
   useEffect(() => {
     checkUserInfo();
@@ -42,7 +44,6 @@ const AdditionalInfoScreen = ({ navigation }) => {
     console.log("Current User Email (lowercase):", userEmail);
 
     try {
-      // Rechercher le document utilisateur en fonction de l'email
       const usersCollection = collection(db, "users");
       const q = query(usersCollection, where("email", "==", userEmail));
       const querySnapshot = await getDocs(q);
@@ -95,6 +96,33 @@ const AdditionalInfoScreen = ({ navigation }) => {
     }
   };
 
+  // Modified function to bypass QR code image generation completely
+  const generateQRInfo = async (userId) => {
+    try {
+      // Generate QR data value - this is what would be encoded in the QR code
+      const qrValue = `${userId}_${Date.now()}`;
+      
+      // Upload the QR value as a text file instead of an image
+      const textBlob = new Blob([qrValue], { type: 'text/plain' });
+      
+      // Upload this text file to Firebase
+      const filename = `qrcodes/${userId}_${Date.now()}.txt`;
+      const storageRef = ref(storage, filename);
+      
+      await uploadBytesResumable(storageRef, textBlob);
+      const fileUrl = await getDownloadURL(storageRef);
+      
+      // Return both the URL and the raw value
+      return {
+        qrCodeUrl: fileUrl,
+        qrValue: qrValue
+      };
+    } catch (error) {
+      console.error("QR info generation failed:", error);
+      throw new Error(`Failed to generate QR info: ${error.message}`);
+    }
+  };
+
   const handleSaveInfo = async () => {
     if (!phoneNumber || !selfie) {
       Alert.alert("Error", "Please provide both phone number and selfie");
@@ -114,7 +142,6 @@ const AdditionalInfoScreen = ({ navigation }) => {
       const userEmail = user.email?.toLowerCase();
       console.log("Saving info for email (lowercase):", userEmail);
 
-      // Rechercher le document utilisateur en fonction de l'email
       const usersCollection = collection(db, "users");
       const q = query(usersCollection, where("email", "==", userEmail));
       const querySnapshot = await getDocs(q);
@@ -134,7 +161,6 @@ const AdditionalInfoScreen = ({ navigation }) => {
 
       let selfieURL = selfie;
 
-      // Upload de l'image si ce n'est pas une URL
       if (!selfie.startsWith("http")) {
         try {
           const manipulateResult = await ImageManipulator.manipulateAsync(
@@ -162,22 +188,36 @@ const AdditionalInfoScreen = ({ navigation }) => {
         }
       }
 
-      // Préparer les données à sauvegarder
+      // Generate QR info without using QR code component
+      let qrInfo = null;
+      try {
+        qrInfo = await generateQRInfo(user.uid);
+        console.log("Successfully generated QR info:", qrInfo);
+      } catch (qrError) {
+        console.error("Failed to generate QR info:", qrError);
+        // Continue without QR code
+      }
+
+      // Prepare user data
       const userData = {
         phoneNumber: phoneNumber,
         selfie: selfieURL,
         updatedAt: new Date().toISOString(),
       };
+      
+      // Add QR info if we have it
+      if (qrInfo) {
+        userData.qrCodeUrl = qrInfo.qrCodeUrl;
+        userData.qrValue = qrInfo.qrValue;
+      }
 
       console.log("Saving to Firestore at:", targetDocRef.path);
       console.log("Data to save:", userData);
 
-      // Si le document existe, utiliser updateDoc pour mettre à jour
       if (documentExists) {
         await updateDoc(targetDocRef, userData);
         console.log("Firestore update successful using updateDoc at:", targetDocRef.path);
       } else {
-        // Si le document n'existe pas, utiliser setDoc pour le créer
         await setDoc(targetDocRef, {
           email: userEmail,
           createdAt: new Date().toISOString(),
@@ -186,12 +226,14 @@ const AdditionalInfoScreen = ({ navigation }) => {
         console.log("Firestore document created using setDoc at:", targetDocRef.path);
       }
 
-      // Vérifier les données après mise à jour
       const updatedDoc = await getDoc(targetDocRef);
       console.log("Updated document data:", updatedDoc.data());
 
-      Alert.alert("Success", "Profile updated successfully!");
-      navigation.navigate("NextPage");
+      // Success message
+      const qrMessage = qrInfo ? " with QR info" : " (QR info will be added later)";
+      Alert.alert("Success", "Profile updated successfully" + qrMessage);
+      navigation.navigate("ScanScreen");
+      
     } catch (error) {
       console.error("Save error details:", error);
       Alert.alert("Error", error.message || "Failed to save information");
@@ -278,6 +320,17 @@ const AdditionalInfoScreen = ({ navigation }) => {
               )}
             </View>
           </TouchableOpacity>
+
+          {/* Hidden QR Code component for future use if needed */}
+          <View style={{ position: 'absolute', opacity: 0, left: -1000, top: -1000 }}>
+            <QRCode
+              value={`${auth.currentUser?.uid || 'default'}_${Date.now()}`}
+              size={300}
+              color="#ff8200"
+              backgroundColor="#FFF8F3"
+              getRef={(ref) => (qrCodeRef.current = ref)}
+            />
+          </View>
 
           <TouchableOpacity
             style={[
