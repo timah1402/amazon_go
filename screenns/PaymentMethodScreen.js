@@ -1,9 +1,13 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, Alert } from "react-native";
+import { View, Text, TouchableOpacity, Alert, Modal, TextInput } from "react-native";
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { doc, updateDoc, increment } from 'firebase/firestore';
+import { db, auth } from '../firebase'; // Adjust the path to your Firebase config
 
 const PaymentMethodScreen = ({ navigation }) => {
   const [selectedMethod, setSelectedMethod] = useState(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [amountInput, setAmountInput] = useState('');
 
   const paymentMethods = [
     {
@@ -24,17 +28,35 @@ const PaymentMethodScreen = ({ navigation }) => {
 
   const handleSelectMethod = (method) => {
     setSelectedMethod(method);
-    Alert.alert("Payment Method Selected", `${method.name} has been selected.`);
+    setIsModalVisible(true); // Show modal instead of alert
+  };
+
+  const handleAddAmount = async () => {
+    const amount = parseFloat(amountInput);
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert("Invalid Amount", "Please enter a valid positive number.");
+      return;
+    }
+    try {
+      const userId = auth.currentUser.uid;
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        balance: increment(amount) // Increment the balance field
+      });
+      Alert.alert("Success", `Added ${amount} to your Dieldem balance.`);
+      setIsModalVisible(false);
+      setAmountInput('');
+    } catch (error) {
+      console.error("Error updating balance:", error);
+      Alert.alert("Error", "Failed to add amount to your balance.");
+    }
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: "#FFF8F3" }}>
-      
       {/* Header Section */}
       <View style={{ paddingTop: 48, paddingHorizontal: 24, paddingBottom: 24 }}>
-        
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          {/* Back Arrow Button */}
           <TouchableOpacity 
             style={{
               padding: 8,
@@ -50,8 +72,6 @@ const PaymentMethodScreen = ({ navigation }) => {
           >
             <Icon name="arrow-back" size={24} color="#ff8200" />
           </TouchableOpacity>
-
-          {/* Title and Subtitle */}
           <View>
             <Text style={{ fontSize: 30, fontWeight: 'bold', color: '#545454', letterSpacing: 0.5 }}>
               DIEULDEM
@@ -60,8 +80,6 @@ const PaymentMethodScreen = ({ navigation }) => {
               Payment Methods
             </Text>
           </View>
-
-          {/* Notification Icon */}
           <TouchableOpacity 
             style={{
               padding: 8,
@@ -157,6 +175,41 @@ const PaymentMethodScreen = ({ navigation }) => {
           </View>
         </TouchableOpacity>
       </View>
+
+      {/* Modal for Amount Input */}
+      <Modal
+        visible={isModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsModalVisible(false)}
+      >
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <View style={{ backgroundColor: 'white', padding: 20, borderRadius: 10, width: '80%' }}>
+            <Text style={{ fontSize: 18, marginBottom: 10 }}>
+              How much would you like to add with {selectedMethod?.name}?
+            </Text>
+            <TextInput
+              style={{ borderWidth: 1, borderColor: '#ccc', padding: 10, marginBottom: 10 }}
+              keyboardType="numeric"
+              value={amountInput}
+              onChangeText={setAmountInput}
+              placeholder="Enter amount"
+            />
+            <TouchableOpacity
+              onPress={handleAddAmount}
+              style={{ backgroundColor: '#ff8200', padding: 10, borderRadius: 5 }}
+            >
+              <Text style={{ color: 'white', textAlign: 'center' }}>OK</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setIsModalVisible(false)}
+              style={{ marginTop: 10 }}
+            >
+              <Text style={{ color: '#ff8200', textAlign: 'center' }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Continue Button */}
       <View style={{ 

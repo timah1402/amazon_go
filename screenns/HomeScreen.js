@@ -1,13 +1,51 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { auth, db } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
+
 import BottomNavBar from "../components/BootomNavbar";
+
 const HomeScreen = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [balance, setBalance] = useState(null); // State to store the user's balance
+  const [userName, setUserName] = useState("User"); // State to store the user's name
+
+  // Fetch the user's balance and name when the component mounts
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) {
+          setBalance(0); // Default to 0 if user is not logged in
+          setUserName("User"); // Default name if user is not logged in
+          return;
+        }
+
+        const userRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          // If balance exists, use it; otherwise, set to 0
+          setBalance(userData.balance || 0);
+          // If name exists, use it; otherwise, use "User"
+          setUserName(userData.fullName || "User");
+        } else {
+          setBalance(0); // If no user document exists, default to 0
+          setUserName("User"); // Default name if no document exists
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+        setBalance(0); // Default to 0 on error
+        setUserName("User"); // Default name on error
+      }
+    };
+
+    fetchUserData();
+  }, []);
 
   const checkUserProfile = async () => {
     try {
@@ -25,12 +63,12 @@ const HomeScreen = ({ navigation }) => {
 
       if (userSnap.exists()) {
         const userData = userSnap.data();
-        // If both photoURL (selfie) and phoneNumber exist and are not empty,
+        // If both selfie and phoneNumber exist and are not empty,
         // navigate directly to ScanScreen
         if (userData.selfie?.trim() && userData.phoneNumber?.trim()) {
           navigation.navigate('ScanScreen');
         } else {
-          // If either photoURL or phoneNumber is missing or empty,
+          // If either selfie or phoneNumber is missing or empty,
           // navigate to AddInfo
           navigation.navigate('AddInfo');
         }
@@ -63,7 +101,7 @@ const HomeScreen = ({ navigation }) => {
                 DIEULDEM
               </Text>
               <Text style={[tw`text-lg`, { color: "#ff8200" }]}>
-                Welcome back, Fatima! 👋
+                Welcome back, {userName}! 👋
               </Text>
             </View>
             <TouchableOpacity
@@ -109,7 +147,7 @@ const HomeScreen = ({ navigation }) => {
               <View>
                 <View>
                   <Text style={[tw`text-2xl font-bold text-white mb-2`, { letterSpacing: 0.5 }]}>
-                    Solde: 12000 CFA
+                    {balance !== null ? `Solde: ${balance} CFA` : "Loading balance..."}
                   </Text>
                 </View>
                 <View style={tw`flex-row items-center`}>
@@ -219,7 +257,6 @@ const HomeScreen = ({ navigation }) => {
         </View>
       </ScrollView>
       <View><BottomNavBar activeScreen="Home" /></View>
-      
     </View>
   );
 };
